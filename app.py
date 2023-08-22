@@ -1,10 +1,14 @@
 import streamlit as st
 import os
+import textwrap
 
 from llama_hub.youtube_transcript import YoutubeTranscriptReader
 
 st.markdown('### llamaindex youtube')
 os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
+
+MAX_CHUNK_LENGTH = 1500
+
 
 url = st.text_input('url of youtube')
 
@@ -24,9 +28,21 @@ else:
 
     st.write(f'文字数: {len(doc_text)}')
 
-    prompt_txt = f'あなたは優秀な編集者です。下記の文章を1/3程度の文量で要約してください。{doc_text}'
+    # テキストの長さが長すぎる場合、その位置で分割
+    chunks = textwrap.wrap(doc_text, width=MAX_CHUNK_LENGTH, break_long_words=True)
 
     #リンク
     st.write("chatgpt [link](https://chat.openai.com/)")
 
-    st.code(prompt_txt)
+    len_chunks = len(chunks)
+    chunks_nums = [i for i in range(len_chunks)]
+    
+    slct_num = st.selectbox('chunk_noを選択', chunks_nums, key='slct_num')
+
+    chunk = f'あなたは優秀な編集者です。下記の文章を1/3程度の文量で要約してください。{chunks[slct_num]}'
+
+    st.code(chunk)
+
+
+        
+        
