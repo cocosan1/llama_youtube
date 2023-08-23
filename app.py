@@ -52,14 +52,18 @@ if submitted:
     # slct_num = st.selectbox('chunk_noを選択', chunks_nums, key='slct_num')
 
     if amounttxt == '全文掲載':
-        for num in chunks_nums:
-            st.write(f'text: {num}-------------------------------------------------')
-            chunk = f'\
-                あなたは優秀な翻訳者です。下記の提示文の日本語訳文を作成してください。\
-                #提示文\
-                {chunks[num]}'
+        if slct_language == 'en':
+            for num in chunks_nums:
+                st.write(f'text: {num}-------------------------------------------------')
+                chunk = f'\
+                    あなたは優秀な翻訳者です。下記の提示文の日本語訳文を作成してください。\
+                    #提示文\
+                    {chunks[num]}'
 
-            st.code(chunk)
+                st.code(chunk)
+        elif slct_language == 'ja':
+            for num in chunks_nums:
+                st.write(chunks[num])
 
     else:
         for num in chunks_nums:
