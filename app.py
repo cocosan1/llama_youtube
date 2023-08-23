@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import textwrap
 
-from llama_index import download_loader
+from llama_hub.youtube_transcript import YoutubeTranscriptReader
 
 st.markdown('### llamaindex youtube')
 os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
@@ -29,11 +29,8 @@ if submitted:
         MAX_CHUNK_LENGTH = 1500
 
     #########################################読み込み
-    YoutubeTranscriptReader = download_loader("YoutubeTranscriptReader")
 
     loader = YoutubeTranscriptReader()
-
-
 
     documents = loader.load_data(ytlinks=[url], languages=[slct_language])
 
