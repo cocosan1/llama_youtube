@@ -1,7 +1,6 @@
 import streamlit as st
 import numpy as np
 import os
-import datetime
 import textwrap # テキスト分割
 import shutil # ディレクトリ削除
 
@@ -31,9 +30,9 @@ selct_language = st.selectbox('言語を選択 ja: 日本語 en: 英語', ['ja',
 
 #文量の最大値設定
 if selct_language == 'ja':
-    MAX_CHUNK_LENGTH = 1500
+    MAX_WORD_LENGTH = 2000
 elif selct_language == 'en':
-    MAX_CHUNK_LENGTH = 3800
+    MAX_WORD_LENGTH = 6000
 
 # url入力
 url = st.text_input('youtubeのURLを入力', key='url')
@@ -61,7 +60,7 @@ def get_text():
 ########### テキストを最大値に合わせて分割
 def divide_text(doc_text):
     # テキストの文量がMAX_CHUNK_LENGTHを超える場合は分割
-    chunks = textwrap.wrap(doc_text, width=MAX_CHUNK_LENGTH, break_long_words=False)
+    chunks = textwrap.wrap(doc_text, width=MAX_WORD_LENGTH, break_long_words=False)
     len_chunks = len(chunks)
 
     st.write(f'words: {len(doc_text)} / len_chunks: {len_chunks}')
