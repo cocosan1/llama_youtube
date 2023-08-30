@@ -7,22 +7,23 @@ import shutil # ディレクトリ削除
 from llama_hub.youtube_transcript import YoutubeTranscriptReader
 
 from llama_index import (
-    GPTVectorStoreIndex,
-    StorageContext,
-    ServiceContext,
+    GPTVectorStoreIndex, # index化
+    StorageContext, # index保存
+    ServiceContext, # サービス全般の設定
 )
 
 from llama_index.storage.docstore import SimpleDocumentStore
 from llama_index.storage.index_store import SimpleIndexStore
 from llama_index.vector_stores import SimpleVectorStore
 from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_index.readers.faiss import FaissReader
-from llama_index.callbacks import CallbackManager, LlamaDebugHandler
-from llama_index.prompts.prompts import QuestionAnswerPrompt
+from llama_index.readers.faiss import FaissReader #queryに類似したテキストのみを使ってindexを作成
+from llama_index.callbacks import CallbackManager, LlamaDebugHandler # 処理のロギング
+from llama_index.prompts.prompts import QuestionAnswerPrompt #コンテキストに対して回答をもとめるようなプロンプト
 
 import faiss #ベクター検索ライブラリ。意味が近い文書を検索
 
 st.title('テキスト抽出app from YouTube')
+# 環境変数設定
 os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
 
 # 言語選択
@@ -59,7 +60,7 @@ def get_text():
 
 ########### テキストを最大値に合わせて分割
 def divide_text(doc_text):
-    # テキストの文量がMAX_CHUNK_LENGTHを超える場合は分割
+    # テキストの文量がMAX_CHUNK_LENGTHを超える場合は分割 list
     chunks = textwrap.wrap(doc_text, width=MAX_WORD_LENGTH, break_long_words=False)
     len_chunks = len(chunks)
 
@@ -71,17 +72,21 @@ def divide_text(doc_text):
 
     return chunks, len_chunks
 
-############ indexを作成
+############ テキストデータの読み込み・index化
 def make_index(documents):
  
-    #テキストデータの読み込み・index化
-    # Indexの作成
+    # Indexの作成　
+    # 各Nodeに対応する埋め込みベクトルと共に順序付けせずに保持
+    # 埋め込みベクトルを使用してNodeを抽出し、それぞれの出力を合成
     index = GPTVectorStoreIndex.from_documents(documents)
+
     # persistでstorage_contextを保存
+    # Vector Storeはベクトルデータを格納/Document Storeはテキストデータ/Index Storeはインデックスに関する情報
     index.storage_context.persist(persist_dir="./storage_context")
 
     st.caption('index化完了')
 
+###################################################################メインの関数
 def non_select():
     st.info('項目を選択してください')
     st.stop()
@@ -94,16 +99,16 @@ def get_alltext():
     chunks, len_chunks = divide_text(doc_text)
 
     #チャンク数に合わせて数字のリストの作成
-    chunks_nums = [i for i in range(len_chunks)]
+    chunk_nums = [i for i in range(len_chunks)]
 
     #日本語　chunksにindex指定しテキストの抽出
     if selct_language == 'ja':  
-        for num in chunks_nums:
+        for num in chunk_nums:
             st.write(chunks[num])
     
     #英語: chunksにindex指定しテキストの抽出　プロンプト作成
-    if selct_language == 'en':
-        for num in chunks_nums:
+    elif selct_language == 'en':
+        for num in chunk_nums:
             st.write(f'prompt: {num}-------------------------------------------------')
             chunk = f'\
                 あなたはプロの翻訳者です。\
@@ -131,13 +136,14 @@ def make_summary():
             st.write(f'prompt: {num}-------------------------------------------------')
             prompt = f'\
                 # 指示書\
-                あなたはプロの雑誌編集者です。\
+                あなたはプロの編集者です。\
                 下記の制約条件に従って提示文を要約してください。\
                 \
                 # 制約条件\
                 - 登場人物の考えや発言、ふるまいに関する情報は削らずに盛り込んでください。\
                 - 具体的な情報については削らずに盛り込んでください。\
                 - {amount_text}の文量になるようしてください。\
+                - 必ず日本語で表示してください。\
                 \
                 # 提示文\
                 {chunks[num]}'
@@ -150,7 +156,7 @@ def make_summary():
             st.write(f'prompt: {num}-------------------------------------------------')
             prompt = f'\
                 # 指示書\
-                あなたはプロの翻訳者兼雑誌編集者です。\
+                あなたはプロの翻訳者兼編集者です。\
                 下記の制約条件と手順に従って提示文を要約してください。\
                 \
                 # 制約条件\
@@ -161,7 +167,7 @@ def make_summary():
                 # 手順\
                 1 英語に翻訳する。\
                 2 制約条件に従い要約する。\
-                3 日本語に訳して表示する。\
+                3 必ず日本語に訳して表示する。\
                 \
                 # 提示文\
                 {chunks[num]}'
@@ -179,8 +185,8 @@ def q_and_a():
     #storage_contextの初期化
     file_path = "./storage_context"
 
-    if os.path.exists(file_path):
-        #指定したファイルパス（またはディレクトリパス）が実際に存在するかどうかを確認
+    if os.path.exists(file_path): #指定したディレクトリパスの存在を確認
+        #ディレクトリ削除
         shutil.rmtree(file_path)
         st.markdown('#### process')
         st.caption("storage_contextフォルダを削除しました。")
@@ -201,6 +207,7 @@ def q_and_a():
 
     #ストレージからindexデータの読み込み
     def read_storage():
+        #from_defaults indexを保存、読み込みする時の設定をデフォルト値で設定
         storage_context = StorageContext.from_defaults(
             docstore=SimpleDocumentStore.from_persist_dir(persist_dir="./storage_context"),
             vector_store=SimpleVectorStore.from_persist_dir(persist_dir="./storage_context"),
@@ -213,46 +220,55 @@ def q_and_a():
     # embeddingモデルのインスタンス化
     embed_model = OpenAIEmbedding()
 
-    # 埋め込みベクトルを保持するためのリスト
-    docs = []
-
-    # 文書のIDとテキストの対応を保持するための辞書
-    id_to_text_map = {}
-
-    #文書データを格納しているストレージコンテキストから文書の一覧を取得
+    # 準備
+    docs = [] # 埋め込みベクトルを保持するためのリスト
+    id_to_text_map = {} # 文書のIDとテキストの対応を保持するための辞書
+    
+    #文書データを格納しているstorage_contextから文書の一覧を取得
     for i, (_, node) in enumerate(storage_context.docstore.docs.items()):
         #文書ノード（node）からテキストを取得
         text = node.get_text()
-        #テキストの埋め込みを生成します
+        #テキストの埋め込みベクトルを生成、リストに保存
         docs.append(embed_model.get_text_embedding(text))
         id_to_text_map[i] = text
+    # listをnp配列化
     docs = np.array(docs)
 
     #text-ada-embedding-002から出力されるベクトル長を指定
     d = 1536
+    # faiss 高次元ベクトルを高速に検索
+    # IndexFlatL2 faissの中で最も基本的な索引（index）の種類。
+    # 索引とは、ベクトルの集合を管理し、検索を効率的に行うためのデータ構造
+    # L2距離（ユークリッド距離）を使って、全てのベクトルとの距離を計算して、最も近いベクトルを返す
+    # 精度は高いが、メモリや計算時間が多く必要
+
+    #インスタンス化
     index = faiss.IndexFlatL2(d)
     #Faissにベクトルを登録
     index.add(docs)
 
-    # クエリとFaissから取り出すノード数の設定
-    query_text = question
-
     # questionのベクトル化
-    query = embed_model.get_text_embedding(query_text)
+    query = embed_model.get_text_embedding(question)
+    # queryをnp配列化
     query=np.array([query])
 
-    # Faissからのquestionに近いノードの取り出し
+    # FaissReader クエリに類似したテキストのみを使ってインデックスを作成
+    # インスタンス化
     reader = FaissReader(index)
     documents = reader.load_data(query=query, id_to_text_map=id_to_text_map, k=num_node)
 
     st.write(f'count_node: {len(documents)}')
 
-    # デバッグ用
-    llama_debug_handler = LlamaDebugHandler()
-    callback_manager = CallbackManager([llama_debug_handler])
+    ######### デバッグ用
+    llama_debug_handler = LlamaDebugHandler() # 処理のロギング
+    # 各処理フェーズにおけるstart, endにおけるコールバックをhandlerとして設定
+    callback_manager = CallbackManager([llama_debug_handler]) 
+
+    # インデックスを作成したりクエリを実行する際に必要になる部品（LLMの予測器、埋め込みモデル、プロンプトヘルパーなど）
+    # をまとめたオブジェクトを作成するメソッド
     service_context = ServiceContext.from_defaults(callback_manager=callback_manager)
 
-    #Faissで確認した類似したノードを使って、GPTListIndexを作成。
+    #Faissで抽出した類似したノードを使って、GPTVectorStoreIndexを作成。
     index = GPTVectorStoreIndex.from_documents(documents, service_context=service_context)
 
     if selct_language == 'ja':
@@ -262,8 +278,10 @@ def q_and_a():
             "---------------------\n"
             "{context_str}"
             "\n---------------------\n"
-            "あなたはAIとして、この情報をもとに質問を日本語で答えます。: {query_str}\n"
+            "あなたはAIとして、この情報をもとに質問に対して必ず日本語で答えます。: {query_str}\n"
         )
+        # QuestionAnswerPrompt 質問と回答の形式で外部データにアクセスできる
+        # コンテキストに対して回答をもとめるようなプロンプト形式
         qa_prompt = QuestionAnswerPrompt(QA_PROMPT_TMPL)
     
     if selct_language == 'en':
@@ -277,14 +295,16 @@ def q_and_a():
         )
         qa_prompt = QuestionAnswerPrompt(QA_PROMPT_TMPL)
     
+    #LlamaIndex のプロンプトをカスタマイズする
     query_engine = index.as_query_engine(text_qa_template=qa_prompt)
 
-    # テンプレを送る
+    # questionを送る
     response = query_engine.query(question)
 
-    #responseからtextとsourseの取り出し
+    #responseからtextの取り出し。sourceも取り出し可。
     response_text = response.response.replace("\n", "")
 
+    # チャット画面に表示
     with st.chat_message("user"):
         st.write(question)
     
