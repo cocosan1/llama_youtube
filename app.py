@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import os
 import textwrap # テキスト分割
-import shutil # ディレクトリ削除
+
 
 from llama_hub.youtube_transcript import YoutubeTranscriptReader
 
@@ -22,6 +22,11 @@ from llama_index.prompts.prompts import QuestionAnswerPrompt #コンテキスト
 
 import faiss #ベクター検索ライブラリ。意味が近い文書を検索
 
+# pip install youtube_transcript_api
+# pip install faiss-cpu
+# pip install nltk
+
+st.set_page_config(page_title='テキスト抽出app')
 st.title('テキスト抽出app from YouTube')
 # 環境変数設定
 os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
@@ -33,7 +38,7 @@ selct_language = st.selectbox('言語を選択 ja: 日本語 en: 英語', ['ja',
 if selct_language == 'ja':
     MAX_WORD_LENGTH = 2000
 elif selct_language == 'en':
-    MAX_WORD_LENGTH = 6000
+    MAX_WORD_LENGTH = 5000
 
 # url入力
 url = st.text_input('youtubeのURLを入力', key='url')
@@ -181,20 +186,7 @@ def q_and_a():
     if not question:
         st.info('質問を入力してください')
         st.stop()
-    
-    #storage_contextの初期化
-    file_path = "./storage_context"
 
-    if os.path.exists(file_path): #指定したディレクトリパスの存在を確認
-        #ディレクトリ削除
-        shutil.rmtree(file_path)
-        st.markdown('#### process')
-        st.caption("storage_contextフォルダを削除しました。")
-        st.caption('テキストのindex化作業を開始します。')
-    else:
-        st.markdown('#### process')
-        st.caption("storage_contextフォルダ は存在しません。")
-        st.caption('テキストのindex化作業を開始します。')
 
     # インスタンス化
     loader = YoutubeTranscriptReader()
